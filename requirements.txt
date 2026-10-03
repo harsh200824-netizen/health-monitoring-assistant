@@ -1,0 +1,5 @@
+__init__.py         ← Step 1 ✅ (empty file)
+    ├── database.py         ← Step 3 ✅ (SQLite code)
+    ├── parser.py           ← Step 4 (understands user messages)
+    ├── scheduler.py        ← Step 5 (reminders and alerts)
+    └── chatbot.py 
