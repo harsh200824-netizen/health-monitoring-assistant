@@ -1,8 +1,14 @@
 import sqlite3
 from pathlib import Path
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
+TIMEZONE = ZoneInfo("Asia/Kolkata")
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "health.db"
+
+
+def now_local():
+    return datetime.now(TIMEZONE)
 
 
 def get_connection():
@@ -82,7 +88,7 @@ def log_dose(medication_id):
     conn = get_connection()
     conn.execute(
         "INSERT INTO dose_log (medication_id, taken_at) VALUES (?, ?)",
-        (medication_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+        (medication_id, now_local().strftime("%Y-%m-%d %H:%M:%S")),
     )
     conn.commit()
     conn.close()
@@ -99,13 +105,25 @@ def get_dose_log():
     return rows
 
 
+def get_doses_taken_today():
+    """Return a set of medication ids already taken today."""
+    today = now_local().strftime("%Y-%m-%d")
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT DISTINCT medication_id FROM dose_log WHERE date(taken_at) = ?",
+        (today,),
+    ).fetchall()
+    conn.close()
+    return {r["medication_id"] for r in rows}
+
+
 # ---------- Health metrics ----------
 
 def add_metric(metric_type, value, unit=""):
     conn = get_connection()
     conn.execute(
         "INSERT INTO health_metrics (metric_type, value, unit, recorded_at) VALUES (?, ?, ?, ?)",
-        (metric_type, str(value), unit, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+        (metric_type, str(value), unit, now_local().strftime("%Y-%m-%d %H:%M:%S")),
     )
     conn.commit()
     conn.close()
