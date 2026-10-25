@@ -4,6 +4,7 @@
 !.env.example
 # Database
 data/*.db
+data/backup/health.db
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
