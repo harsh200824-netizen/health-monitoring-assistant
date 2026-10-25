@@ -1,0 +1,7 @@
+<health_data>
+  <record>
+    <metric_type>steps</metric_type>
+    <value>4000</value>
+    <unit>steps</unit>
+  </record>
+</health_data>

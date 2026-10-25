@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Smart Health Assistant</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f7fb;
+            color: #222;
+        }
+
+        header {
+            background: #1e3a5f;
+            color: white;
+            padding: 20px 40px;
+        }
+
+        header h1 {
+            margin-bottom: 5px;
+        }
+
+        header p {
+            font-size: 14px;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 30px auto;
+        }
+
+        .cards {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            flex: 1;
+            min-width: 220px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h3 {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .number {
+            font-size: 32px;
+            font-weight: bold;
+        }
+
+        .section,
+        .chat-box {
+            background: white;
+            margin-top: 25px;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .section h2,
+        .chat-box h2 {
+            margin-bottom: 15px;
+        }
+
+        ul {
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+
+        .insight-box {
+            background: #eef6ff;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border-left: 5px solid #1e3a5f;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background: #e8f5e9;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            background: #1e3a5f;
+            color: white;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        /* CHAT */
+
+        #chatMessages {
+            height: 350px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            background: #f8fafc;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 12px 15px;
+            margin-bottom: 12px;
+            border-radius: 10px;
+            line-height: 1.5;
+        }
+
+        .user-message {
+            margin-left: auto;
+            background: #1e3a5f;
+            color: white;
+        }
+
+        .ai-message {
+            margin-right: auto;
+            background: #e8f1fb;
+            color: #222;
+        }
+
+        .chat-input {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .chat-input input {
+            flex: 1;
+            padding: 13px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 15px;
+        }
+
+        .chat-input button {
+            margin-top: 0;
+            padding: 13px 22px;
+        }
+
+        #voiceButton {
+            background: #2e7d32;
+        }
+
+        #voiceButton.listening {
+            background: #c62828;
+        }
+
+        .voice-status {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .loading {
+            font-style: italic;
+            color: #666;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>Smart Health Assistant</h1>
+    <p>Health Insights Dashboard</p>
+</header>
+
+
+<div class="container">
+
+    <!-- DASHBOARD CARDS -->
+
+    <div class="cards">
+
+        <div class="card">
+            <h3>Active Medications</h3>
+            <div class="number" id="medications">0</div>
+        </div>
+
+        <div class="card">
+            <h3>Doses Recorded</h3>
+            <div class="number" id="doses">0</div>
+        </div>
+
+        <div class="card">
+            <h3>Health Metrics</h3>
+            <div class="number" id="metrics">0</div>
+        </div>
+
+    </div>
+
+
+    <!-- AI CHAT -->
+
+    <div class="chat-box">
+
+        <h2>💬 AI Health Assistant</h2>
+
+        <div id="chatMessages">
+
+            <div class="message ai-message">
+                Hello! I'm your Smart Health Assistant.
+                You can ask me about your medications,
+                health records, weather, or general health information.
+            </div>
+
+        </div>
+
+
+        <div class="chat-input">
+
+            <input
+                type="text"
+                id="questionInput"
+                placeholder="Ask a health question..."
+                onkeydown="handleEnter(event)"
+            >
+
+            <button onclick="askQuestion()">
+                Send
+            </button>
+
+            <button
+                id="voiceButton"
+                onclick="startVoiceRecognition()"
+            >
+                🎤 Voice
+            </button>
+
+        </div>
+
+
+        <div
+            id="voiceStatus"
+            class="voice-status"
+        >
+            Voice assistant ready.
+        </div>
+
+    </div>
+
+
+    <!-- INSIGHTS -->
+
+    <div class="section">
+
+        <h2>Health Insights</h2>
+
+        <div id="insightsList">
+
+            <div class="insight-box">
+                Loading health insights...
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- MEDICATIONS -->
+
+    <div class="section">
+
+        <h2>Recent Medications</h2>
+
+        <ul id="medicineList">
+            <li>Loading...</li>
+        </ul>
+
+    </div>
+
+
+    <!-- DOSE HISTORY -->
+
+    <div class="section">
+
+        <h2>Recent Dose History</h2>
+
+        <ul id="doseList">
+            <li>Loading...</li>
+        </ul>
+
+    </div>
+
+
+    <!-- HEALTH METRICS -->
+
+    <div class="section">
+
+        <h2>Recent Health Metrics</h2>
+
+        <ul id="metricList">
+            <li>Loading...</li>
+        </ul>
+
+    </div>
+
+
+    <!-- API STATUS -->
+
+    <div class="status">
+
+        <strong>API Status:</strong>
+
+        <span id="apiStatus">
+            Checking...
+        </span>
+
+    </div>
+
+
+    <button onclick="loadAnalytics()">
+        Refresh Health Data
+    </button>
+
+</div>
+
+
+<script>
+
+    /* ---------------- DASHBOARD ---------------- */
+
+    async function loadAnalytics() {
+
+        try {
+
+            const analyticsResponse =
+                await fetch(
+                    "http://127.0.0.1:8000/analytics"
+                );
+
+            const data =
+                await analyticsResponse.json();
+
+
+            const insightsResponse =
+                await fetch(
+                    "http://127.0.0.1:8000/insights"
+                );
+
+            const insightsData =
+                await insightsResponse.json();
+
+
+            document.getElementById("medications").textContent =
+                data.active_medications;
+
+            document.getElementById("doses").textContent =
+                data.total_doses_recorded;
+
+            document.getElementById("metrics").textContent =
+                data.total_health_metrics;
+
+
+            const insightsList =
+                document.getElementById("insightsList");
+
+            insightsList.innerHTML = "";
+
+
+            insightsData.insights.forEach(function(insight) {
+
+                const div =
+                    document.createElement("div");
+
+                div.className =
+                    "insight-box";
+
+                div.textContent =
+                    insight;
+
+                insightsList.appendChild(div);
+
+            });
+
+
+            const medicineList =
+                document.getElementById("medicineList");
+
+            medicineList.innerHTML = "";
+
+
+            if (data.medications.length === 0) {
+
+                medicineList.innerHTML =
+                    "<li>No active medications found.</li>";
+
+            } else {
+
+                data.medications.forEach(function(medicine) {
+
+                    const li =
+                        document.createElement("li");
+
+                    li.textContent =
+                        medicine.name +
+                        " - " +
+                        (medicine.dosage || "No dosage") +
+                        " at " +
+                        medicine.time;
+
+                    medicineList.appendChild(li);
+
+                });
+
+            }
+
+
+            const doseList =
+                document.getElementById("doseList");
+
+            doseList.innerHTML = "";
+
+
+            if (data.recent_doses.length === 0) {
+
+                doseList.innerHTML =
+                    "<li>No dose records found.</li>";
+
+            } else {
+
+                data.recent_doses.forEach(function(dose) {
+
+                    const li =
+                        document.createElement("li");
+
+                    li.textContent =
+                        dose.name +
+                        " - " +
+                        dose.taken_at;
+
+                    doseList.appendChild(li);
+
+                });
+
+            }
+
+
+            const metricList =
+                document.getElementById("metricList");
+
+            metricList.innerHTML = "";
+
+
+            if (data.recent_metrics.length === 0) {
+
+                metricList.innerHTML =
+                    "<li>No health metrics found.</li>";
+
+            } else {
+
+                data.recent_metrics.forEach(function(metric) {
+
+                    const li =
+                        document.createElement("li");
+
+                    li.textContent =
+                        metric.metric_type +
+                        ": " +
+                        metric.value +
+                        " " +
+                        (metric.unit || "") +
+                        " (" +
+                        metric.recorded_at +
+                        ")";
+
+                    metricList.appendChild(li);
+
+                });
+
+            }
+
+
+            document.getElementById("apiStatus").textContent =
+                "Connected ✓";
+
+        }
+
+        catch (error) {
+
+            console.error(error);
+
+            document.getElementById("apiStatus").textContent =
+                "Connection failed ✗";
+
+        }
+
+    }
+
+
+    /* ---------------- TEXT AI CHAT ---------------- */
+
+    async function askQuestion() {
+
+        const input =
+            document.getElementById("questionInput");
+
+        const question =
+            input.value.trim();
+
+
+        if (question === "") {
+
+            return;
+
+        }
+
+
+        addMessage(
+            question,
+            "user-message"
+        );
+
+
+        input.value = "";
+
+
+        const loading =
+            addMessage(
+                "Thinking...",
+                "ai-message loading"
+            );
+
+
+        try {
+
+            const response =
+                await fetch(
+                    "http://127.0.0.1:8000/ask",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body: JSON.stringify({
+                            question: question
+                        })
+                    }
+                );
+
+
+            const data =
+                await response.json();
+
+
+            loading.remove();
+
+
+            if (response.ok) {
+
+                addMessage(
+                    data.answer,
+                    "ai-message"
+                );
+
+            } else {
+
+                addMessage(
+                    "Sorry, I couldn't process your question.",
+                    "ai-message"
+                );
+
+            }
+
+        }
+
+        catch (error) {
+
+            console.error(error);
+
+            loading.remove();
+
+            addMessage(
+                "Unable to connect to the Health Assistant API.",
+                "ai-message"
+            );
+
+        }
+
+    }
+
+
+    /* ---------------- VOICE RECOGNITION ---------------- */
+
+    function startVoiceRecognition() {
+
+        const SpeechRecognition =
+            window.SpeechRecognition ||
+            window.webkitSpeechRecognition;
+
+
+        if (!SpeechRecognition) {
+
+            document.getElementById("voiceStatus").textContent =
+                "Voice recognition is not supported in this browser.";
+
+            return;
+
+        }
+
+
+        const recognition =
+            new SpeechRecognition();
+
+
+        recognition.lang = "en-IN";
+
+        recognition.continuous = false;
+
+        recognition.interimResults = false;
+
+
+        const voiceButton =
+            document.getElementById("voiceButton");
+
+        const voiceStatus =
+            document.getElementById("voiceStatus");
+
+
+        recognition.start();
+
+
+        voiceButton.classList.add("listening");
+
+        voiceButton.textContent =
+            "🔴 Listening...";
+
+        voiceStatus.textContent =
+            "Listening... Please speak your health question.";
+
+
+        recognition.onresult =
+            function(event) {
+
+                const transcript =
+                    event.results[0][0].transcript;
+
+
+                document.getElementById(
+                    "questionInput"
+                ).value = transcript;
+
+
+                voiceStatus.textContent =
+                    "Voice converted to text. Sending to AI...";
+
+
+                voiceButton.classList.remove(
+                    "listening"
+                );
+
+                voiceButton.textContent =
+                    "🎤 Voice";
+
+
+                askQuestion();
+
+            };
+
+
+        recognition.onerror =
+            function(event) {
+
+                console.error(
+                    "Speech recognition error:",
+                    event.error
+                );
+
+
+                voiceStatus.textContent =
+                    "Voice recognition error: " +
+                    event.error;
+
+
+                voiceButton.classList.remove(
+                    "listening"
+                );
+
+                voiceButton.textContent =
+                    "🎤 Voice";
+
+            };
+
+
+        recognition.onend =
+            function() {
+
+                voiceButton.classList.remove(
+                    "listening"
+                );
+
+                voiceButton.textContent =
+                    "🎤 Voice";
+
+            };
+
+    }
+
+
+    /* ---------------- CHAT MESSAGE ---------------- */
+
+    function addMessage(
+        text,
+        className
+    ) {
+
+        const chatMessages =
+            document.getElementById(
+                "chatMessages"
+            );
+
+
+        const message =
+            document.createElement("div");
+
+
+        message.className =
+            "message " + className;
+
+
+        message.textContent =
+            text;
+
+
+        chatMessages.appendChild(
+            message
+        );
+
+
+        chatMessages.scrollTop =
+            chatMessages.scrollHeight;
+
+
+        return message;
+
+    }
+
+
+    /* ---------------- ENTER KEY ---------------- */
+
+    function handleEnter(event) {
+
+        if (event.key === "Enter") {
+
+            askQuestion();
+
+        }
+
+    }
+
+
+    /* ---------------- START ---------------- */
+
+    loadAnalytics();
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,25 @@
+
+{
+  "patient": "Test User",
+  "metrics": [
+    {
+      "metric_type": "weight",
+      "value": 55,
+      "unit": "kg"
+    },
+    {
+      "metric_type": "heart_rate",
+      "value": 75,
+      "unit": "bpm"
+    }
+  ],
+  "fitness": [
+    {
+      "activity_type": "walking",
+      "duration_minutes": 30,
+      "steps": 3000,
+      "distance_km": 2.1,
+      "calories_burned": 120
+    }
+  ]
+}
