@@ -1,8 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+//frontend-react/src/App.jsx
+import { useCallback, useEffect, useState } from "react";
 import "./App.css";
 import Auth from "./Auth";
+import WellnessTracker from "./WellnessTracker";
+import VoiceButton from "./VoiceButton";
+import LabelScanner from "./LabelScanner";
 
-const API = "http://127.0.0.1:8000";
+const API = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 
 const apiFetch = (path, options = {}, token) => {
   const headers = new Headers(options.headers || {});
@@ -11,18 +15,18 @@ const apiFetch = (path, options = {}, token) => {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  return fetch(`http://127.0.0.1:8000/${path}`, {
+  return fetch(`${API}/${path}`, {
     ...options,
     headers,
   });
 };
-const NAV = ["Overview", "Fitness", "Medications", "Health goals", "Import data", "Reports", "AI assistant"];
+const NAV = ["Overview", "Fitness", "Medications", "Health goals", "Import data", "Reports", "AI assistant", "Wellness tracker", "Family"];
 const pretty = (value) => String(value ?? "—").replaceAll("_", " ");
 
 
   function App() {
   const [token, setToken] = useState("");
-  const [summary, setSummary] = useState(null), [analytics, setAnalytics] = useState(null), [insights, setInsights] = useState(null);
+  const [summary, setSummary] = useState(null), [, setAnalytics] = useState(null), [insights, setInsights] = useState(null);
   const [medications, setMedications] = useState([]), [doseHistory, setDoseHistory] = useState([]), [metrics, setMetrics] = useState([]);
   const [fitnessActivities, setFitnessActivities] = useState([]), [fitnessSummary, setFitnessSummary] = useState(null), [goalProgress, setGoalProgress] = useState([]);
   const [apiStatus, setApiStatus] = useState("Checking"), [loading, setLoading] = useState(true), [loadError, setLoadError] = useState("");
@@ -36,7 +40,7 @@ const pretty = (value) => String(value ?? "—").replaceAll("_", " ");
   const [interactionText, setInteractionText] = useState(""), [interaction, setInteraction] = useState(null), [interactionError, setInteractionError] = useState(""), [checkingInteractions, setCheckingInteractions] = useState(false);
   const [goalForm, setGoalForm] = useState({ goal_type: "", target_value: "", unit: "" }), [goalMessage, setGoalMessage] = useState(""), [savingGoal, setSavingGoal] = useState(false);
 
-  const loadDashboard = async () => {
+ const loadDashboard = useCallback(async () => {
     setLoading(true); setLoadError("");
     try {
       const paths = ["health/summary", "analytics", "insights", "medications", "dose-history", "health-metrics", "fitness-activities", "fitness-summary", "health-goals/progress"];
@@ -49,17 +53,56 @@ const pretty = (value) => String(value ?? "—").replaceAll("_", " ");
       setSummary(s); setAnalytics(a); setInsights(i); setMedications(m); setDoseHistory(d); setMetrics(h); setFitnessActivities(f); setFitnessSummary(fs); setGoalProgress(g);
     } catch (error) { setLoadError(error.message || "Could not load dashboard data. Check the API connection."); }
     finally { setLoading(false); }
-  };
-  const checkAPI = async () => { try { const res = await fetch(`${API}/health`); const data = await res.json(); setApiStatus(res.ok && data.status === "healthy" ? "Connected" : "Unavailable"); } catch { setApiStatus("Unavailable"); } };
- useEffect(() => {
-  checkAPI();
-
-  if (token) {
-    loadDashboard();
-  } else {
-    setLoading(false);
+ }, [token]);
+ const checkAPI = useCallback(async () => {
+  try {
+    const res = await fetch(`${API}/health`);
+    const data = await res.json();
+    setApiStatus(res.ok && data.status === "healthy" ? "Connected" : "Unavailable");
+  } catch {
+    setApiStatus("Unavailable");
   }
-}, [token]);
+ }, []);
+ useEffect(() => {
+  let cancelled = false;
+
+  const runChecks = async () => {
+    await Promise.resolve();
+
+    if (cancelled) return;
+
+    try {
+      const res = await fetch(`${API}/health`);
+      const data = await res.json();
+
+      if (!cancelled) {
+        setApiStatus(
+          res.ok && data.status === "healthy"
+            ? "Connected"
+            : "Unavailable"
+        );
+      }
+    } catch {
+      if (!cancelled) {
+        setApiStatus("Unavailable");
+      }
+    }
+
+    if (cancelled) return;
+
+    if (token) {
+      await loadDashboard();
+    } else {
+      setLoading(false);
+    }
+  };
+
+  runChecks();
+
+  return () => {
+    cancelled = true;
+  };
+}, [token, loadDashboard]);
   const addFitnessActivity = async (event) => {
   event.preventDefault();
   setFitnessMessage("");
@@ -251,15 +294,45 @@ const addGoal = async (event) => {
   }
 };
 
-  const metricTypes = [...new Set(metrics.map((metric) => metric.metric_type))];
-  const selectedMetric = metricTypes.includes(chartMetric) ? chartMetric : metricTypes[0];
-  const chart = useMemo(() => {
-    const data = [...metrics].filter((item) => item.metric_type === selectedMetric).reverse().slice(-14).map((item) => ({ ...item, numeric: Number(item.value) })).filter((item) => Number.isFinite(item.numeric));
-    if (!data.length) return null;
-    const min = Math.min(...data.map((item) => item.numeric)), max = Math.max(...data.map((item) => item.numeric)), range = max - min || 1;
-    return { data, points: data.map((item, index) => `${data.length === 1 ? 50 : 12 + index * (76 / (data.length - 1))},${92 - ((item.numeric - min) / range) * 66}`).join(" ") };
-  }, [metrics, selectedMetric]);
-  const setCurrentSection = (name) => { setSection(name); setMenuOpen(false); document.getElementById(name.replaceAll(" ", "-").toLowerCase())?.scrollIntoView({ behavior: "smooth", block: "start" }); };
+const metricTypes = [...new Set(metrics.map((metric) => metric.metric_type))];
+
+const selectedMetric = metricTypes.includes(chartMetric)
+  ? chartMetric
+  : metricTypes[0];
+
+const chartData = [...metrics]
+  .filter((item) => item.metric_type === selectedMetric)
+  .reverse()
+  .slice(-14)
+  .map((item) => ({
+    ...item,
+    numeric: Number(item.value),
+  }))
+  .filter((item) => Number.isFinite(item.numeric));
+
+let chart = null;
+
+if (chartData.length > 0) {
+  const min = Math.min(...chartData.map((item) => item.numeric));
+  const max = Math.max(...chartData.map((item) => item.numeric));
+  const range = max - min || 1;
+
+  chart = {
+    data: chartData,
+    points: chartData
+      .map((item, index) => {
+        const x = chartData.length === 1
+          ? 50
+          : 12 + index * (76 / (chartData.length - 1));
+
+        const y = 92 - ((item.numeric - min) / range) * 66;
+
+        return `${x},${y}`;
+      })
+      .join(" "),
+  };
+}
+  const setCurrentSection = (name) => { setSection(name); setMenuOpen(false); const targetId = name === "Family" ? "wellness-tracker" : name.replaceAll(" ", "-").toLowerCase(); document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" }); };
   if (!token) {
     return <Auth onLogin={setToken} />;
   }
@@ -268,7 +341,7 @@ const addGoal = async (event) => {
     <aside className={`sidebar ${menuOpen ? "sidebar-open" : ""}`}>
       <a className="brand" href="#overview" onClick={() => setCurrentSection("Overview")}><span className="brand-mark">✳</span><span>pulse<span className="brand-accent">care</span><small>HEALTH INTELLIGENCE</small></span></a>
       <div className="nav-label">WORKSPACE</div>
-      <nav aria-label="Main navigation">{NAV.map((item, index) => <button key={item} className={`nav-item ${section === item ? "active" : ""}`} onClick={() => setCurrentSection(item)}><span className="nav-icon">{["◫", "⌁", "✚", "◎", "⇧", "▤", "✧"][index]}</span>{item}</button>)}</nav>
+      <nav aria-label="Main navigation">{NAV.map((item, index) => <button key={item} className={`nav-item ${section === item ? "active" : ""}`} onClick={() => setCurrentSection(item)}><span className="nav-icon">{["◫", "⌁", "✚", "◎", "⇧", "▤", "✧", "♡", "♧"][index]}</span>{item}</button>)}</nav>
       <div className="sidebar-bottom"><div className="privacy-card"><span className="shield">◈</span><strong>Your health, protected</strong><p>Your health records stay in your connected workspace.</p></div><div className="profile"><div className="avatar">H</div><div><strong>Health profile</strong><span>Personal workspace</span></div><span className="profile-more">···</span></div></div>
     </aside>
     {menuOpen && <button className="mobile-scrim" aria-label="Close navigation" onClick={() => setMenuOpen(false)} />}
@@ -292,8 +365,9 @@ const addGoal = async (event) => {
         <section id="health-goals" className="section-block"><div className="section-title"><div><span className="eyebrow">YOUR TARGETS</span><h2>Health goals</h2></div></div><div className="two-column"><article className="panel"><div className="panel-heading"><div><span className="eyebrow">PROGRESS</span><h3>Goal tracking</h3></div></div>{goalProgress.length ? <div className="goal-list">{goalProgress.map((goal) => <div className="goal-item" key={goal.id}><div className="goal-top"><strong>{pretty(goal.goal_type)}</strong><span>{goal.progress_percent}%</span></div><div className="goal-values">{goal.current_value} / {goal.target_value} {goal.unit}</div><progress value={goal.progress_percent} max="100" aria-label={`${pretty(goal.goal_type)} progress`} /><div className="goal-foot"><span>{goal.completed ? "Completed" : "In progress"}</span><span>Target {goal.target_value} {goal.unit}</span></div></div>)}</div> : <EmptyState loading={loading} text="No health goals added yet." />}</article><article className="panel"><div className="panel-heading"><div><span className="eyebrow">SET AN INTENTION</span><h3>Create a health goal</h3></div></div><form className="form-grid" onSubmit={addGoal}><label className="field span-two">Goal type<input value={goalForm.goal_type} onChange={(e) => setGoalForm({ ...goalForm, goal_type: e.target.value })} required maxLength="50" placeholder="Daily steps, weekly activity…" /></label><label className="field">Target value<input type="number" min="0.01" max="1000000" step="any" value={goalForm.target_value} onChange={(e) => setGoalForm({ ...goalForm, target_value: e.target.value })} required /></label><label className="field">Unit<input value={goalForm.unit} onChange={(e) => setGoalForm({ ...goalForm, unit: e.target.value })} required maxLength="30" placeholder="steps, minutes…" /></label><div className="form-footer span-two"><button className="button button-primary" disabled={savingGoal}>{savingGoal ? "Adding…" : "Add goal"}</button>{goalMessage && <span className="form-message" role="status">{goalMessage}</span>}</div></form></article></div></section>
         <section id="import-data" className="section-block"><div className="section-title"><div><span className="eyebrow">DATA MANAGEMENT</span><h2>Import health data</h2></div></div><article className="panel import-panel"><div className="import-copy"><div className="upload-icon">⇧</div><div><h3>Bring your records together</h3><p>Import health metric records from a JSON, CSV, or XML file. Files must be under 2 MB.</p><span className="format-pills"><i>JSON</i><i>CSV</i><i>XML</i></span></div></div><form onSubmit={importData} className="import-form"><label className="file-picker">Choose a data file<input type="file" accept=".json,.csv,.xml,application/json,text/csv,application/xml,text/xml" onChange={(e) => setFile(e.target.files?.[0] || null)} required /></label><button className="button button-primary" disabled={!file || importing}>{importing ? "Importing…" : "Import records"}</button></form>{importError && <div className="state-banner error" role="alert">{importError}</div>}{importState && <div className="import-result" role="status"><strong>{importState.message}</strong><span>{importState.imported_records} imported</span><span>{importState.skipped_records} skipped</span><small>{importState.filename} · {importState.format?.toUpperCase()}</small></div>}</article></section>
         <section id="reports" className="section-block"><div className="section-title"><div><span className="eyebrow">YOUR RECORD, SUMMARIZED</span><h2>Health reports</h2></div><button className="button button-primary" onClick={generateReport} disabled={reportState === "loading"}>{reportState === "loading" ? "Generating…" : "Generate report"}</button></div>{reportError && <div className="state-banner error" role="alert">{reportError}</div>}{report ? <article className="panel report-panel"><div className="report-header"><div><span className="eyebrow">GENERATED REPORT</span><h3>{report.report_title}</h3></div><span className="report-date">{report.generated_at ? new Date(report.generated_at).toLocaleString() : ""}</span></div><div className="report-grid">{Object.entries(report.health_summary || {}).map(([key, value]) => <div className="report-stat" key={key}><span>{pretty(key)}</span><strong>{value}</strong></div>)}{Object.entries(report.fitness_summary || {}).map(([key, value]) => <div className="report-stat" key={key}><span>{pretty(key)}</span><strong>{value}</strong></div>)}</div><h4>Goal progress</h4>{report.goal_progress?.length ? report.goal_progress.map((goal) => <p className="report-goal" key={goal.id}>{pretty(goal.goal_type)}: {goal.current_value} / {goal.target_value} {goal.unit} ({goal.progress_percent}%)</p>) : <p className="muted">No goals available in this report.</p>}<p className="report-note">{report.note}</p></article> : <article className="panel report-placeholder"><span className="report-icon">▤</span><div><h3>{reportState === "loading" ? "Preparing your report…" : "A readable summary of your health data"}</h3><p>Generate a report to see your recorded metrics, activity summary, and goal progress in one place.</p></div></article>}</section>
-        <section id="ai-assistant" className="section-block"><div className="section-title"><div><span className="eyebrow">AI HEALTH ASSISTANT</span><h2>Ask about your health record</h2></div></div><article className="panel assistant-panel"><div className="assistant-orb">✧</div><div className="assistant-intro"><h3>How can I help?</h3><p>Ask about information in your stored record or a general health topic.</p></div><form onSubmit={askAI} className="assistant-form"><label className="sr-only" htmlFor="health-question">Your question</label><textarea id="health-question" rows="3" maxLength="500" value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="For example: What medications are in my record?" required /><button className="button button-primary" disabled={loadingAI || !question.trim()}>{loadingAI ? "Thinking…" : "Ask assistant  →"}</button></form>{aiError && <div className="state-banner error" role="alert">{aiError}</div>}{answer && <div className="answer-card" aria-live="polite"><div className="answer-heading"><span className="answer-avatar">✧</span><strong>Assistant response</strong></div><p>{answer}</p><small>AI generated · For informational purposes only</small></div>}<p className="assistant-disclaimer">AI responses can be incomplete or inaccurate and are not a substitute for professional medical advice.</p></article></section>
+        <section id="ai-assistant" className="section-block"><div className="section-title"><div><span className="eyebrow">AI HEALTH ASSISTANT</span><h2>Ask about your health record</h2></div></div><article className="panel assistant-panel"><div className="assistant-orb">✧</div><div className="assistant-intro"><h3>How can I help?</h3><p>Ask about information in your stored record or a general health topic.</p></div><form onSubmit={askAI} className="assistant-form"><label className="sr-only" htmlFor="health-question">Your question</label><textarea id="health-question" rows="3" maxLength="500" value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="For example: What medications are in my record?" required /><VoiceButton onText={(text) => setQuestion(text)} disabled={loadingAI} /> <button className="button button-primary" disabled={loadingAI || !question.trim()}>{loadingAI ? "Thinking…" : "Ask assistant  →"}</button></form>{aiError && <div className="state-banner error" role="alert">{aiError}</div>}{answer && <div className="answer-card" aria-live="polite"><div className="answer-heading"><span className="answer-avatar">✧</span><strong>Assistant response</strong></div><p>{answer}</p><small>AI generated · For informational purposes only</small></div>}<p className="assistant-disclaimer">AI responses can be incomplete or inaccurate and are not a substitute for professional medical advice.</p><LabelScanner token={token} /></article></section>
         <section className="section-block records-section"><div className="section-title"><div><span className="eyebrow">HEALTH RECORD</span><h2>Recent measurements</h2></div></div><article className="panel"><DataTable loading={loading} rows={metrics.slice(0, 10)} empty="No health metrics recorded." columns={[["metric_type", "Metric"], ["value", "Value"], ["unit", "Unit"], ["recorded_at", "Recorded at"]]} /></article></section>
+        <WellnessTracker token={token} activeTab={section === "Family" ? "family" : undefined} />
         <footer className="app-footer"><span>Pulsecare · Personal health workspace</span><span>Health information is for tracking purposes and is not a diagnosis.</span></footer>
       </div>
     </main>

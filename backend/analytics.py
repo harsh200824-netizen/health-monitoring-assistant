@@ -1,3 +1,4 @@
+#backend/analytics.py
 from backend.database.database import (
     get_medications,
     get_dose_log,
@@ -5,10 +6,14 @@ from backend.database.database import (
 )
 
 
-def get_health_analytics():
+def get_health_analytics(user_id):
     """Calculate basic health analytics from stored data."""
 
-    medications = get_medications(active_only=True)
+    medications = get_medications(
+        user_id=user_id,
+        active_only=True
+    )
+
     dose_log = get_dose_log()
     metrics = get_metrics()
 

@@ -1,3 +1,4 @@
+# src/database.py
 import sqlite3
 from pathlib import Path
 from datetime import datetime
@@ -234,11 +235,12 @@ def get_doses_taken_today():
 
 # ---------- Health metrics ----------
 
-def add_metric(metric_type, value, unit=""):
+def add_metric(metric_type, value, unit="", user_id=None):
     conn = get_connection()
     conn.execute(
-        "INSERT INTO health_metrics (metric_type, value, unit, recorded_at) VALUES (?, ?, ?, ?)",
-        (metric_type, str(value), unit, now_local().strftime("%Y-%m-%d %H:%M:%S")),
+        """INSERT INTO health_metrics (metric_type, value, unit, recorded_at, user_id)
+           VALUES (?, ?, ?, ?, ?)""",
+        (metric_type, str(value), unit, now_local().strftime("%Y-%m-%d %H:%M:%S"), user_id),
     )
     conn.commit()
     conn.close()

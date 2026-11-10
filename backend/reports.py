@@ -9,8 +9,8 @@ from backend.database.database import (
 )
 
 
-def generate_health_report():
-    analytics = get_health_analytics()
+def generate_health_report(user_id):
+    analytics = get_health_analytics(user_id=user_id)
     summary = get_health_summary()
     fitness = get_fitness_summary()
     goals = get_health_goal_progress()

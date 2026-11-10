@@ -1,4 +1,4 @@
-
+#backend/main.py
 from fastapi import (
     FastAPI,
     HTTPException,
@@ -10,14 +10,13 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 import csv
 import io
 import json
 import math
 import xml.etree.ElementTree as ET
-
 
 from backend.auth import (
     hash_password,
@@ -49,6 +48,14 @@ from backend.agent import run_agent
 from backend.reports import generate_health_report
 from backend.tools.medicine_tools import check_medication_interactions
 
+# Week 5-6 (Track A, Option A2): Medication & Wellness Tracker
+from backend.wellness.router import router as wellness_router
+from backend.wellness.schema import init_wellness_db
+
+from backend.wellness.schema_b import init_schema_b
+
+
+
 app = FastAPI(
     title="Smart Health Assistant API",
     description="Backend API for the Track B Smart Health Assistant",
@@ -56,6 +63,7 @@ app = FastAPI(
 )
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
@@ -96,15 +104,28 @@ app.add_middleware(
 )
 
 # Initialize database
-# Initialize database
 init_db()
 migrate_user_id()
+init_wellness_db()
+init_schema_b()          # Track B tables
+
+app.include_router(wellness_router)
 
 
 # ---------- Request models ----------
 
 class QuestionRequest(BaseModel):
     question: str = Field(min_length=1, max_length=500)
+
+    @field_validator("question")
+    @classmethod
+    def validate_question(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Question cannot be empty.")
+        if any(ord(char) < 32 and char not in "\\n\\r\\t" for char in value):
+            raise ValueError("Question contains unsupported control characters.")
+        return value
 
 
 class RegisterRequest(BaseModel):
@@ -197,8 +218,6 @@ def register_user(request: RegisterRequest):
         conn.close()
 
 
-
-
 @app.post("/login")
 def login_user(
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -236,8 +255,8 @@ def login_user(
     }
 
 
-
 # ---------- Health data ----------
+
 @app.get("/health/summary")
 def health_summary(current_user: dict = Depends(get_current_user)):
     return get_health_summary(current_user["user_id"])
@@ -245,7 +264,11 @@ def health_summary(current_user: dict = Depends(get_current_user)):
 
 @app.get("/medications")
 def medications(current_user: dict = Depends(get_current_user)):
-    return get_medications(active_only=True)
+    # FIX: Pass the logged-in user's ID.
+    return get_medications(
+        user_id=current_user["user_id"],
+        active_only=True,
+    )
 
 
 @app.get("/dose-history")
@@ -253,11 +276,9 @@ def dose_history(current_user: dict = Depends(get_current_user)):
     return get_dose_log()
 
 
-
 @app.get("/health-metrics")
 def health_metrics(current_user: dict = Depends(get_current_user)):
     return get_metrics()
-
 
 
 @app.get("/analytics")
@@ -265,7 +286,6 @@ def analytics(current_user: dict = Depends(get_current_user)):
     return get_health_analytics(
         user_id=current_user["user_id"]
     )
-
 
 
 @app.get("/insights")
@@ -276,23 +296,19 @@ def health_insights(
         user_id=current_user["user_id"]
     )
 
+
 # ---------- AI assistant ----------
+
 @app.post("/ask")
+@app.post("/workflow")
 def ask_question(
     request: QuestionRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    answer = run_agent(request.question)
-
-    return {
-        "question": request.question,
-        "answer": answer,
-    }
-
     result = health_workflow.invoke({
         "question": request.question,
+        "user_id": current_user["user_id"],
     })
-
     return result["result"]
 
 
@@ -304,7 +320,10 @@ def fitness_activities(current_user: dict = Depends(get_current_user)):
 
 
 @app.post("/fitness-activities")
-def create_fitness_activity(request: FitnessActivityRequest, current_user: dict = Depends(get_current_user)):
+def create_fitness_activity(
+    request: FitnessActivityRequest,
+    current_user: dict = Depends(get_current_user),
+):
     activity_type = request.activity_type.strip()
 
     if not activity_type:
@@ -337,10 +356,12 @@ def create_fitness_activity(request: FitnessActivityRequest, current_user: dict 
         sleep_hours=request.sleep_hours,
         notes=request.notes,
     )
+
     return {
         "message": "Fitness activity saved successfully.",
         "id": activity_id,
     }
+
 
 @app.get("/fitness-summary")
 def fitness_summary(current_user: dict = Depends(get_current_user)):
@@ -348,14 +369,17 @@ def fitness_summary(current_user: dict = Depends(get_current_user)):
 
 
 # ---------- Health goals ----------
+
 @app.get("/health-goals")
 def health_goals(current_user: dict = Depends(get_current_user)):
     return get_health_goals()
 
 
-
 @app.post("/health-goals")
-def create_health_goal(request: HealthGoalRequest, current_user: dict = Depends(get_current_user)):
+def create_health_goal(
+    request: HealthGoalRequest,
+    current_user: dict = Depends(get_current_user),
+):
     goal_type = request.goal_type.strip()
     unit = request.unit.strip()
 
@@ -375,6 +399,7 @@ def create_health_goal(request: HealthGoalRequest, current_user: dict = Depends(
         "message": "Health goal created successfully.",
         "id": goal_id,
     }
+
 
 @app.get("/health-goals/progress")
 def health_goal_progress(current_user: dict = Depends(get_current_user)):
@@ -528,4 +553,4 @@ async def import_health_data(
 
 @app.get("/health-report")
 def health_report(current_user: dict = Depends(get_current_user)):
-    return generate_health_report()
+    return generate_health_report(user_id=current_user["user_id"])

@@ -1,1 +1,9 @@
-:root{font-family:'DM Sans',sans-serif;color:#e8edf4;background:#0b111b;font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}*{box-sizing:border-box}html{min-width:320px;min-height:100%;scroll-behavior:smooth}body{margin:0;min-width:320px;min-height:100vh}#root{width:100%;min-height:100vh}button,input,textarea,select{font:inherit}button{cursor:pointer}img{max-width:100%}::selection{color:#071a1e;background:#55d9c8}
+:root{font-family:'Inter',sans-serif;color:#1b2a5a;background:#eef4fb;font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+*{box-sizing:border-box}
+html{min-width:320px;min-height:100%;scroll-behavior:smooth}
+body{margin:0;min-width:320px;min-height:100vh}
+#root{width:100%;min-height:100vh}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+img{max-width:100%}
+::selection{color:#fff;background:#2f6fe4}
